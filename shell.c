@@ -19,6 +19,11 @@ void handle_sigchld(int sig){
   }
 }
 
+void handle_sigint(int sig){
+  (void)sig;
+  printf("\n");
+}
+
 
 int main(){
   char* line = NULL;
@@ -29,6 +34,7 @@ int main(){
   int history_cnt = 0;
 
   signal(SIGCHLD, handle_sigchld);
+  signal(SIGINT, handle_sigint);
 
   while(1){
     int background = 0;
@@ -254,6 +260,18 @@ int main(){
     }
     args[i] = NULL;
 
+    for(int j=0; args[j]!=NULL;j++){
+      if(args[j][0] == '$'){
+        char *val = getenv(args[j]+1);
+
+        if(val != NULL){
+          args[j] = val;
+        }else{
+          args[j] = "";
+        }
+      }
+    }
+
     if(args[0] == NULL){
       continue;
     }
@@ -289,6 +307,7 @@ int main(){
       }
       continue;
     }
+
 
     pid_t pid = fork();
     if(pid == 0){
