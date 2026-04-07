@@ -36,6 +36,88 @@ int main(){
       break;
     }
 
+    char* pipe_pos = strchr(line, '|');
+
+    if(pipe_pos != NULL){
+      *pipe_pos = '\0';
+
+      char *cmd1_str = line;
+      char *cmd2_str = pipe_pos +1;
+
+      char* args1[100];
+      int i=0;
+      char *tok = strtok(cmd1_str, " ");
+      while(tok != NULL){
+        args1[i++] = tok;
+        tok = strtok(NULL, " ");
+      }
+      args1[i] = NULL;
+
+      char *args2[100];
+      i=0;
+      tok = strtok(cmd2_str, " ");
+      while(tok != NULL){
+        args2[i++] = tok;
+        tok = strtok(NULL, " ");
+      }
+      args2[i] = NULL;
+      continue;
+
+      if(args1[0] == NULL || args2[0] == NULL){
+        continue;
+      }
+
+      int fd[2];
+      pipe(fd);
+
+      if(pipe(fd) == -1){
+        perror("pipe failed");
+        continue;
+      }
+
+      pid_t pid1 = fork();
+       if(pid1==0){
+        dup2(fd[1], STDOUT_FILENO);
+
+        close(fd[0]);
+        close(fd[1]);
+
+        execvp(args1[0], args1);
+        perror("execvp cmd1 failed");
+        exit(1);
+      }else if(pid1 < 0){
+        perror("fork1 failed");
+        close(fd[0]);
+        close(fd[1]);
+        continue;
+      }
+
+      pid_t pid2 = fork();
+      if(pid2 == 0){
+        dup2(fd[1], STDOUT_FILENO);
+
+        close(fd[0]);
+        close(fd[1]);
+
+        execvp(args2[0], args2);
+        perror("execvp cmd2 failed");
+        exit(1);
+      }else if(pid2 < 0){
+        perror("fork2 failed");
+        close(fd[0]);
+        close(fd[1]);
+        wait(NULL);
+        continue;
+      }
+
+      close(fd[0]);
+      close(fd[1]);
+
+      wait(NULL);
+      wait(NULL);
+
+      continue;
+    }
     char *args[100];
     int i=0;
 
