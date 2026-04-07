@@ -4,6 +4,21 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <sys/types.h>
+
+void handle_sigchld(int sig){
+  (void)sig;
+
+  int status;
+  pid_t pid;
+
+  while((pid = waitpid(-1, &status, WNOHANG)) > 0){
+    printf("\n[done] PID %d finished\n", pid);
+    fflush(stdout);
+  }
+}
+
 
 int main(){
   char* line = NULL;
@@ -12,6 +27,8 @@ int main(){
   char prompt[1100];
   char *history[100];
   int history_cnt = 0;
+
+  signal(SIGCHLD, handle_sigchld);
 
   while(1){
     int background = 0;
@@ -282,7 +299,7 @@ int main(){
        if(background == 0){
          wait(NULL);
        }else{
-         printf("[background] process started\n");
+         printf("[background] PID %d started\n", pid);
        }
     }else{
        perror("fork failed");
