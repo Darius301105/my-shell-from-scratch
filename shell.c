@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 int main(){
   char* line = NULL;
@@ -35,6 +36,105 @@ int main(){
     if(strcmp(line, "exit\n") == 0 || strcmp(line, "exit") == 0){
       break;
     }
+
+    char* redir_out = strchr(line, '>');
+
+    if(redir_out != NULL){
+      *redir_out = '\0';
+
+      char *cmd_str = line;
+      char *file_str = redir_out +1;
+
+      while(*file_str == ' '){
+        file_str++;
+      }
+
+      char* args[100];
+      int i=0;
+
+      char *token = strtok(cmd_str, " ");
+      while(token != NULL){
+        args[i++] = token;
+        token = strtok(NULL, " ");
+      }
+      args[i] = NULL;
+
+      if(args[0] == NULL || *file_str == '\0'){
+        continue;
+      }
+
+      pid_t pid = fork();
+      if(pid == 0){
+        int fd = open(file_str, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if(fd == -1){
+          perror("open");
+          exit(1);
+        }
+
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+
+        execvp(args[0], args);
+        perror("execvp failed");
+        exit(1);
+      }else if(pid > 0){
+	wait(NULL);
+      }else{
+	perror("fork failed");
+      }
+
+      continue;
+    }
+
+    char *redir_in = strchr(line, '<');
+
+    if(redir_in != NULL){
+      *redir_in = '\0';
+
+      char *cmd_str = line;
+      char *file_str = redir_in +1;
+
+      while(*file_str == ' '){
+        file_str++;
+      }
+
+      char *args[100];
+      int i=0;
+
+      char *token = strtok(cmd_str, " ");
+      while(token != NULL){
+        args[i++] = token;
+        token = strtok(NULL, " ");
+      }
+      args[i] = NULL;
+
+      if(args[0] == NULL || *file_str == '\0'){
+        continue;
+      }
+
+      pid_t pid = fork();
+      if(pid == 0){
+        int fd = open(file_str, O_RDONLY);
+	if(fd == -1){
+	  perror("exit");
+          exit(1);
+	}
+
+	dup2(fd, STDIN_FILENO);
+	close(fd);
+
+	execvp(args[0], args);
+	perror("execvp failed");
+	exit(1);
+      }else if(pid > 0){
+        wait(NULL);
+      }else{
+        perror("fork failed");
+      }
+
+      continue;
+    }
+
 
     char* pipe_pos = strchr(line, '|');
 
