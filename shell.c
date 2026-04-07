@@ -7,9 +7,16 @@
 int main(){
   char* line = NULL;
   size_t len = 0;
+  char cwd[1024];
+  char prompt[1100];
 
   while(1){
-    fputs("my-shell-from-scratch> ", stdout);
+    if(getcwd(cwd, sizeof(cwd)) != NULL){
+      snprintf(prompt, sizeof(prompt), "my-shell-from-scratch%s> ", cwd);
+    }else{
+      snprintf(prompt, sizeof(prompt), "my-shell-from-scratch> ");
+    }
+    fputs(prompt, stdout);
     fflush(stdout);
 
     if(getline(&line, &len, stdin) == -1){
@@ -33,6 +40,17 @@ int main(){
     args[i] = NULL;
 
     if(args[0] == NULL){
+      continue;
+    }
+
+    if(strcmp(args[0], "cd") == 0){
+      if(args[1] == NULL){
+        chdir(getenv("HOME"));
+      }else{
+        if(chdir(args[1]) == -1){
+          perror("cd");
+        }
+      }
       continue;
     }
 
