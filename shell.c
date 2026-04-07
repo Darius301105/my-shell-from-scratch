@@ -14,6 +14,7 @@ int main(){
   int history_cnt = 0;
 
   while(1){
+    int background = 0;
     if(getcwd(cwd, sizeof(cwd)) != NULL){
       snprintf(prompt, sizeof(prompt), "my-shell%s> ", cwd);
     }else{
@@ -27,6 +28,14 @@ int main(){
     }
 
     line[strcspn(line, "\n")] = '\0';
+
+    int len = strlen(line);
+
+    if(len > 0 && line[len-1] == '&'){
+      line[len-1] = '\0';
+      background = 1;
+    }
+
 
     if(strcmp(line, "") != 0){
       history[history_cnt] = strdup(line);
@@ -267,10 +276,14 @@ int main(){
     pid_t pid = fork();
     if(pid == 0){
       execvp(args[0], args);
-      perror("error");
+      perror("execvp failed");
       exit(1);
     }else if(pid>0){
-       wait(NULL);
+       if(background == 0){
+         wait(NULL);
+       }else{
+         printf("[background] process started\n");
+       }
     }else{
        perror("fork failed");
     }
