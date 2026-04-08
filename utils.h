@@ -10,5 +10,7 @@ void execute_command(char **args, int background);
 void execute_pipe(char **cmds, int n_cmds);
 void execute_redir_out(char *cmd_str, char *file_str);
 void execute_redir_in(char *cmd_str, char *file_str);
+char* read_line(char **history, int history_cnt);
+
 
 #endif

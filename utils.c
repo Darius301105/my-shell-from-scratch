@@ -4,8 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <termios.h>
+
 
 #include "utils.h"
+
+
 
 void handle_sigchld(int sig){
   (void)sig;
@@ -213,7 +217,100 @@ void execute_redir_in(char *cmd_str, char* file_str){
   }
 }
 
+char* read_line(char **history, int history_cnt){
+  (void)history;
+  (void)history_cnt;
+  
+  struct termios oldt,newt;
+  
+  if(tcgetattr(STDIN_FILENO, &oldt) == -1){
+    return NULL;
+  }
+  
+  newt = oldt;
+  newt.c_lflag &= ~(ICANON | ECHO);
+  
+  if(tcsetattr(STDIN_FILENO, TCSANOW, &newt) == -1){
+    return NULL;
+  }
+  
+  char buffer[1024];
+  int pos = 0;
+  int history_idx = history_cnt;
+  char c;
+  
+while (1) {
+    ssize_t n = read(STDIN_FILENO, &c, 1);
+    if (n <= 0) {
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        return NULL;
+    }
 
+    if (c == '\n') {
+        write(STDOUT_FILENO, "\n", 1);
+        buffer[pos] = '\0';
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        return strdup(buffer);
+    }
+    else if (c == 127 || c == 8) {
+        if (pos > 0) {
+            pos--;
+            write(STDOUT_FILENO, "\b \b", 3);
+        }
+    }
+    else if (c == '\033') {
+        char seq[2];
+        read(STDIN_FILENO, &seq[0], 1);
+        read(STDIN_FILENO, &seq[1], 1);
+
+        if (seq[0] == '[' && seq[1] == 'A') {
+            if (history_idx > 0) {
+                history_idx--;
+
+                while (pos > 0) {
+                    write(STDOUT_FILENO, "\b \b", 3);
+                    pos--;
+                }
+
+                strcpy(buffer, history[history_idx]);
+                pos = strlen(buffer);
+                write(STDOUT_FILENO, buffer, pos);
+            }
+        }
+        else if (seq[0] == '[' && seq[1] == 'B') {
+            if (history_idx < history_cnt - 1) {
+                history_idx++;
+
+                while (pos > 0) {
+                    write(STDOUT_FILENO, "\b \b", 3);
+                    pos--;
+                }
+
+                strcpy(buffer, history[history_idx]);
+                pos = strlen(buffer);
+                write(STDOUT_FILENO, buffer, pos);
+            }
+            else if (history_idx == history_cnt - 1) {
+                history_idx = history_cnt;
+
+                while (pos > 0) {
+                    write(STDOUT_FILENO, "\b \b", 3);
+                    pos--;
+                }
+
+                buffer[0] = '\0';
+                pos = 0;
+            }
+        }
+    }
+    else {
+        if (pos < 1023) {
+            buffer[pos++] = c;
+            write(STDOUT_FILENO, &c, 1);
+        }
+    }
+  }
+}
 
 
 

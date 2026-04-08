@@ -12,7 +12,6 @@
 
 int main(){
   char* line = NULL;
-  size_t len = 0;
   char cwd[1024];
   char prompt[1100];
   char *history[100];
@@ -24,18 +23,20 @@ int main(){
   while(1){
     int background = 0;
     if(getcwd(cwd, sizeof(cwd)) != NULL){
-      snprintf(prompt, sizeof(prompt), "my-shell%s> ", cwd);
+      snprintf(prompt, sizeof(prompt), "my-shell:%s> ", cwd);
     }else{
       snprintf(prompt, sizeof(prompt), "my-shell> ");
     }
     fputs(prompt, stdout);
     fflush(stdout);
 
-    if(getline(&line, &len, stdin) == -1){
+    line = read_line(history, history_cnt);
+    
+    if(line == NULL){
+      free(line);
+      line = NULL;
       break;
     }
-
-    line[strcspn(line, "\n")] = '\0';
 
     int len = strlen(line);
 
@@ -50,7 +51,9 @@ int main(){
       history_cnt++;
     }
 
-    if(strcmp(line, "exit\n") == 0 || strcmp(line, "exit") == 0){
+    if(strcmp(line, "exit") == 0){
+      free(line);
+      line = NULL;
       break;
     }
 
@@ -58,6 +61,8 @@ int main(){
     if(redir_out != NULL){
       *redir_out = '\0';
       execute_redir_out(line, redir_out+1);
+      free(line);
+      line = NULL;
       continue;
     }
 
@@ -65,6 +70,8 @@ int main(){
     if(redir_in != NULL){
       *redir_in = '\0';
       execute_redir_in(line, redir_in+1);
+      free(line);
+      line = NULL;
       continue;
     }
 
@@ -85,6 +92,8 @@ int main(){
 
     if(n_cmds > 1){
       execute_pipe(cmds, n_cmds);
+      free(line);
+      line = NULL;
       continue;
     }
 
@@ -111,26 +120,36 @@ int main(){
     }
 
     if(args[0] == NULL){
+      free(line);
+      line = NULL;
       continue;
     }
 
     if(strcmp(args[0], "help") == 0){
       builtin_help();
+      free(line);
+      line = NULL;
       continue;
     }
 
     if(strcmp(args[0], "history") == 0){
       builtin_history(history, history_cnt);
+      free(line);
+      line = NULL;
       continue;
     }
 
     if(strcmp(args[0], "cd") == 0){
       builtin_cd(args);
+      free(line);
+      line = NULL;
       continue;
     }
 
 
     execute_command(args, background);
+    free(line);
+    line = NULL;
   }
    free(line);
    return 0;
