@@ -167,98 +167,97 @@ int main(){
       continue;
     }
 
-
-    char* pipe_pos = strchr(line, '|');
-
-    if(pipe_pos != NULL){
-      *pipe_pos = '\0';
-
-      char *cmd1_str = line;
-      char *cmd2_str = pipe_pos +1;
-
-      char* args1[100];
-      int i=0;
-      char *tok = strtok(cmd1_str, " ");
-      while(tok != NULL){
-        args1[i++] = tok;
-        tok = strtok(NULL, " ");
+    int n_cmds = 1;
+    for(int k=0; line[k] != '\0'; k++){
+      if(line[k] == '|'){
+        n_cmds++;
       }
-      args1[i] = NULL;
-
-      char *args2[100];
-      i=0;
-      tok = strtok(cmd2_str, " ");
-      while(tok != NULL){
-        args2[i++] = tok;
-        tok = strtok(NULL, " ");
-      }
-      args2[i] = NULL;
-      continue;
-
-      if(args1[0] == NULL || args2[0] == NULL){
-        continue;
-      }
-
-      int fd[2];
-      pipe(fd);
-
-      if(pipe(fd) == -1){
-        perror("pipe failed");
-        continue;
-      }
-
-      pid_t pid1 = fork();
-       if(pid1==0){
-        dup2(fd[1], STDOUT_FILENO);
-
-        close(fd[0]);
-        close(fd[1]);
-
-        execvp(args1[0], args1);
-        perror("execvp cmd1 failed");
-        exit(1);
-      }else if(pid1 < 0){
-        perror("fork1 failed");
-        close(fd[0]);
-        close(fd[1]);
-        continue;
-      }
-
-      pid_t pid2 = fork();
-      if(pid2 == 0){
-        dup2(fd[1], STDOUT_FILENO);
-
-        close(fd[0]);
-        close(fd[1]);
-
-        execvp(args2[0], args2);
-        perror("execvp cmd2 failed");
-        exit(1);
-      }else if(pid2 < 0){
-        perror("fork2 failed");
-        close(fd[0]);
-        close(fd[1]);
-        wait(NULL);
-        continue;
-      }
-
-      close(fd[0]);
-      close(fd[1]);
-
-      wait(NULL);
-      wait(NULL);
-
-      continue;
     }
-    char *args[100];
+
+    char *cmds[100];
     int i=0;
-
-    char *token = strtok(line, " ");
-    while(token != NULL){
-      args[i++] = token;
-      token = strtok(NULL, " ");
+    char *tok = strtok(line, "|");
+    while(tok != NULL){
+      cmds[i++] = tok;
+      tok = strtok(NULL, "|");
     }
-    args[i] = NULL;
+
+    if(n_cmds > 1){
+      int fd[99][2];
+      for(int p=0;p<n_cmds - 1;p++){
+        if(pipe(fd[p]) == -1){
+	  perror("pipe");
+          exit(1);
+        }
+      }
+
+      for(int i=0;i<n_cmds;i++){
+        pid_t pid = fork();
+
+        if(pid < 0){
+          perror("fork");
+          exit(1);
+        }
+
+        if(pid == 0){
+          char *args[100];
+          int j=0;
+          char *tok2 = strtok(cmds[i], " \t\n");
+          while(tok2 != NULL){
+            args[j++] = tok2;
+            tok2 = strtok(NULL, " \t\n");
+          }
+          args[j] = NULL;
+
+          if(args[0] == NULL){
+            exit(0);
+          }
+
+          if(i>0){
+            if(dup2(fd[i-1][0], STDIN_FILENO) == -1){
+              perror("dup2 stdin");
+              exit(1);
+            }
+          }
+
+          if(i<n_cmds - 1){
+            if(dup2(fd[i][1], STDOUT_FILENO) == -1){
+	      perror("dup2 stdout");
+              exit(1);
+            }
+          }
+
+          for(int k=0;k<n_cmds-1;k++){
+            close(fd[k][0]);
+            close(fd[k][1]);
+          }
+
+          execvp(args[0], args);
+          perror("execvp");
+          exit(1);
+        }
+      }
+
+      for(int p=0;p<n_cmds-1;p++){
+        close(fd[p][0]);
+        close(fd[p][1]);
+      }
+
+      for(int i=0;i<n_cmds-1;i++){
+        wait(NULL);
+      }
+      continue;
+    }
+
+    char *args[100];
+    int a=0;
+
+    char *token = strtok(line, " \t\n");
+    while(token != NULL){
+      args[a++] = token;
+      token = strtok(NULL, " \t\n");
+    }
+    args[a] = NULL;
 
     for(int j=0; args[j]!=NULL;j++){
       if(args[j][0] == '$'){
