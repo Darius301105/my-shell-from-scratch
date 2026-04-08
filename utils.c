@@ -5,6 +5,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <dirent.h>
 
 
 #include "utils.h"
@@ -217,7 +218,7 @@ void execute_redir_in(char *cmd_str, char* file_str){
   }
 }
 
-char* read_line(char **history, int history_cnt){
+char* read_line(char **history, int history_cnt, const char* prompt){
   (void)history;
   (void)history_cnt;
   
@@ -302,6 +303,50 @@ while (1) {
                 pos = 0;
             }
         }
+    }else if(c == '\t'){
+      char prefix[1024];
+      strncpy(prefix, buffer, pos);
+      prefix[pos] = '\0';
+      
+      DIR *dir = opendir(".");
+      if(dir != NULL){
+        struct dirent *entry;
+        char matches[100][1024];
+        int match_count = 0;
+        
+        while((entry = readdir(dir)) != NULL){
+          if(strncmp(entry->d_name, prefix, strlen(prefix)) == 0){
+            if(match_count < 100){
+              strcpy(matches[match_count], entry->d_name);
+              match_count++;
+            }
+          }
+        }
+        
+        closedir(dir);
+        
+        if(match_count == 1){
+          while(pos > 0){
+            write(STDOUT_FILENO, "\b \b", 3);
+            pos--;
+          }
+          
+          strcpy(buffer, matches[0]);
+          pos = strlen(buffer);
+          write(STDOUT_FILENO, buffer, pos);
+        }else if(match_count > 1){
+          write(STDOUT_FILENO, "\n", 1);
+          
+          for(int i=0;i<match_count;i++){
+            printf("%s ", matches[i]);
+          }
+          fflush(stdout);
+          
+          write(STDOUT_FILENO, "\n", 1);
+          write(STDOUT_FILENO, prompt, strlen(prompt));
+          write(STDOUT_FILENO, buffer, pos);
+        }else{}
+      }
     }
     else {
         if (pos < 1023) {

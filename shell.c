@@ -30,7 +30,7 @@ int main(){
     fputs(prompt, stdout);
     fflush(stdout);
 
-    line = read_line(history, history_cnt);
+    line = read_line(history, history_cnt, prompt);
     
     if(line == NULL){
       free(line);
